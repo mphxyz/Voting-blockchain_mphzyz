@@ -1,0 +1,115 @@
+script>
+let blockchain = [];
+let pemilihSah = [];
+let walletAddress = "-";
+
+async function sha256(text) {
+  const msgBuffer = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function buatGenesis() {
+  const genesis = {
+    index: 0,
+    timestamp: new Date().toLocaleString(),
+    vote: "Genesis Block",
+    prevHash: "0",
+    wallet: "SYSTEM",
+    hash: "",
+    valid: true
+  };
+  genesis.hash = await sha256(genesis.index + genesis.timestamp + genesis.vote + genesis.prevHash);
+  blockchain.push(genesis);
+  tampilkanBlockchain();
+}
+
+async function tambahSuara() {
+  if (walletAddress === "-" || walletAddress === "Dompet tidak ditemukan!") {
+    alert("Hubungkan wallet terlebih dahulu.");
+    return;
+  }
+
+  if (pemilihSah.includes(walletAddress)) {
+    alert("Kamu sudah vote sekali. Tidak bisa dua kali!");
+    return;
+  }
+
+  const vote = document.getElementById("voteSelect").value;
+  const prev = blockchain[blockchain.length - 1];
+  const index = blockchain.length;
+  const timestamp = new Date().toLocaleString();
+  const prevHash = prev.hash;
+  const hash = await sha256(index + timestamp + vote + prevHash);
+
+  const newBlock = {
+    index,
+    timestamp,
+    vote,
+    wallet: walletAddress,
+    prevHash,
+    hash,
+    valid: true
+  };
+
+  pemilihSah.push(walletAddress);
+  blockchain.push(newBlock);
+  tampilkanBlockchain();
+}
+
+function tampilkanBlockchain() {
+  const div = document.getElementById("blockchain");
+  const rekap = { "Kandidat A": 0, "Kandidat B": 0, "Kandidat C": 0 };
+  div.innerHTML = "";
+
+  blockchain.forEach((blok, i) => {
+    blok.valid = i === 0 || blok.prevHash === blockchain[i - 1].hash;
+    if (rekap.hasOwnProperty(blok.vote)) {
+      rekap[blok.vote]++;
+    }
+
+    div.innerHTML += \`
+      <div style="border:1px solid \${blok.valid ? 'green' : 'red'}; padding:10px; margin:10px;">
+        <b>Blok \${blok.index}</b><br>
+        Waktu: \${blok.timestamp}<br>
+        Suara: \${blok.vote}<br>
+        Wallet: \${blok.wallet}<br>
+        Hash: \${blok.hash}<br>
+        PrevHash: \${blok.prevHash}<br>
+        Status: \${blok.valid ? '✅ Valid' : '❌ Tidak Valid'}
+      </div>
+    \`;
+  });
+
+  const rekapList = document.getElementById("rekap");
+  rekapList.innerHTML = "";
+  for (let kandidat in rekap) {
+    rekapList.innerHTML += `<li>\${kandidat}: \${rekap[kandidat]} suara</li>`;
+  }
+}
+
+function exportJSON() {
+  const jsonStr = JSON.stringify(blockchain, null, 2);
+  const blob = new Blob([jsonStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "blockchain_voting.json";
+  a.click();
+}
+
+async function connectWallet() {
+  if (window.ethereum) {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    walletAddress = accounts[0];
+  } else {
+    walletAddress = "Dompet tidak ditemukan!";
+  }
+  document.getElementById("wallet").innerText = "Wallet: " + walletAddress;
+}
+
+buatGenesis();
+</script>
+</body>
+</html>
